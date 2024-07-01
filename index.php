@@ -1,82 +1,44 @@
 <?php
-// Incluye el autoload de Composer para cargar las dependencias de GuzzleHttp
-require 'vendor/autoload.php';
-
-// Importa la clase Client de GuzzleHttp para hacer peticiones HTTP
-use GuzzleHttp\Client;
-
-// Inicia la sesión para almacenar el requestId
+//llamo a config.php donde estan las credenciales
+require 'config.php';
+//inicia sesion donde se almacenan datos
 session_start();
 
-// Define las credenciales y la URL base de Placetopay
-$login = '2d9eaf1e662518756a3d78806543af5b';
-$secretKey = '3YC5brb5eAR4xBGQ';
-$baseURL = 'https://checkout-test.placetopay.com/';
-
-// Crea una instancia del cliente GuzzleHttp con la URL base y un timeout de 2 segundos
-$client = new Client([
-    'base_uri' => $baseURL,
-    'timeout'  => 2.0,
-]);
-
-// Genera el seed (semilla) y el nonce (número único) para la autenticación
-$seed = date('c');
-$rawNonce = rand();
-$tranKey = base64_encode(hash('sha256', $rawNonce . $seed . $secretKey, true));
-$nonce = base64_encode($rawNonce);
-
-// Define los datos para la solicitud de pago a Placetopay
-$data = [
-    'auth' => [
-        'login' => $login,
-        'tranKey' => $tranKey,
-        'nonce' => $nonce,
-        'seed' => $seed,
-    ],
-    'payment' => [
-        'reference' => "PAY_ABC_1287", // Referencia única del pago
-        'description' => 'Pago por Placetopay',
-        'amount' => [
-            'currency' => 'USD', //monto y tipo de moneda proporcionada
-            'total' => 1000,
-        ],
-    ],
-    'locale' => "es_CO", // Configuración regional en español para Colombia
-    'buyer' => [  //datos de comprador
-        'name' => 'Jonnathan',
-        'surname' => 'Scarpetta',
-        'email' => 'jonsxscar@gmail.com',
-        'documentType' => 'CC',
-        'document' => '1127610884',
-        'mobile' => '3148308656',
-    ],
-    'expiration' => date('c', strtotime('+1 day')), // Fecha de expiración de la sesión de pago
-    'returnUrl' => 'http://localhost:8000/return.php', // Redireccionamiento después del pago
-    'ipAddress' => '127.0.0.1', // Dirección IP del comprador
-    'userAgent' => 'PHP-Client', // Agente de usuario utilizado para la solicitud
+$defaultValues = $_SESSION['error_fields'] ?? [
+    'name' => '',
+    'surname' => '',
+    'email' => '',
+    'phone' => '',
+    'id' => '',
 ];
-
-try {
-    // Realiza la solicitud POST para crear la sesión de pago
-    $response = $client->post('api/session', [
-        'json' => $data,
-    ]);
-
-    // Obtiene el cuerpo de la respuesta y lo decodifica
-    $body = $response->getBody();
-    $responseData = json_decode($body, true);
-
-    // Verifica si se recibió el 'processUrl' en la respuesta
-    if (isset($responseData['processUrl'])) {
-        // Almacena el requestId en la sesión para usarlo en return.php
-        $_SESSION['requestId'] = $responseData['requestId'];
-        // Redirige al usuario al processUrl para completar la transacción en Placetopay
-        header('Location: ' . $responseData['processUrl']);
-        exit;
-    } else {
-        echo 'Error: No processUrl found in the response.';
-    }
-} catch (Exception $e) {
-    echo 'Error: ' . $e->getMessage();
-}
 ?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Iniciar Transacción</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Iniciar Transacción</h1>
+        <!-- Formulario que envía datos a 'process.php' usando el método POST -->
+        <form action="process.php" method="post">
+            <?php
+            // Si hay un error en la URL muestra un mensaje de error
+                if (isset($_GET['error'])) {
+                    echo '<p class="message error">Por favor, complete el formulario e intente nuevamente.</p>';
+                }
+            ?>
+
+            <input type="text" name="name" placeholder="Nombre" required value="<?= $defaultValues['name'] ?>" />
+            <input type="text" name="surname" placeholder="Apellido" required value="<?= $defaultValues['surname'] ?>" />
+            <input type="email" name="email" placeholder="Correo" required value="<?= $defaultValues['email'] ?>" />
+            <input type="tel" name="phone" placeholder="Teléfono" required value="<?= $defaultValues['phone'] ?>" />
+            <input type="number" name="id" placeholder="Cédula de ciudadanía" required value="<?= $defaultValues['id'] ?>" />
+            <button type="submit">Iniciar Pago basico</button>
+        </form>
+    </div>
+</body>
+</html>
